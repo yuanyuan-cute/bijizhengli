@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>笔记整理助手 · 图片识别 + 自我考核</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">📒</span>
+      <div>
+        <h1>笔记整理助手</h1>
+        <p>上传图片 → 识别文字 → 整理笔记 → 自我考核</p>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-view="upload">📷 上传识别</button>
+      <button class="tab" data-view="notes">📝 我的笔记 <span class="badge" id="noteCount">0</span></button>
+      <button class="tab" data-view="quiz">✅ 自我考核</button>
+      <button class="tab" data-view="settings">⚙️ 设置</button>
+    </nav>
+  </header>
+
+  <main class="container">
+
+    <!-- ============ 上传识别 ============ -->
+    <section class="view active" id="view-upload">
+      <div class="panel">
+        <h2>上传图片</h2>
+        <p class="hint">支持拍照的课本、讲义、单词表、错题等。可一次选多张，自动合并识别。</p>
+        <div class="dropzone" id="dropzone">
+          <input type="file" id="fileInput" accept="image/*" multiple hidden />
+          <div class="dz-inner">
+            <div class="dz-icon">🖼️</div>
+            <p><strong>点击选择图片</strong> 或 拖拽图片到这里</p>
+            <p class="dz-sub">支持 JPG / PNG / WEBP</p>
+          </div>
+        </div>
+
+        <div class="previews" id="previews"></div>
+
+        <div class="controls-row">
+          <div class="field">
+            <label>识别语言</label>
+            <div class="langs" id="langs">
+              <label class="chip"><input type="checkbox" value="eng" checked /> English</label>
+              <label class="chip"><input type="checkbox" value="chi_sim" checked /> 中文（简体）</label>
+            </div>
+          </div>
+          <button class="btn primary" id="btnOcr" disabled>🔍 开始识别</button>
+        </div>
+
+        <div class="progress" id="ocrProgress" hidden>
+          <div class="progress-bar"><span id="progressFill"></span></div>
+          <p class="progress-text" id="progressText">准备中…</p>
+        </div>
+      </div>
+
+      <div class="panel" id="resultPanel" hidden>
+        <h2>识别结果 / 原文</h2>
+        <p class="hint">可直接修改下方文字，再整理成笔记。</p>
+        <textarea id="rawText" rows="10" placeholder="识别出的文字会显示在这里，可手动编辑…"></textarea>
+        <div class="controls-row">
+          <button class="btn" id="btnParse">🧠 自动整理成笔记</button>
+          <button class="btn accent" id="btnAiParse">✨ AI 智能整理</button>
+          <button class="btn ghost" id="btnClearRaw">清空</button>
+        </div>
+        <p class="hint" id="parseHint">「自动整理」在本地完成（无需联网）；「AI 智能整理」需先在“设置”里配置接口。</p>
+        <div class="card-list" id="parsedPreview"></div>
+      </div>
+    </section>
+
+    <!-- ============ 我的笔记 ============ -->
+    <section class="view" id="view-notes">
+      <div class="panel">
+        <div class="toolbar">
+          <input type="search" id="searchInput" placeholder="搜索笔记…" />
+          <select id="typeFilter">
+            <option value="all">全部类型</option>
+            <option value="word">单词</option>
+            <option value="qa">问答</option>
+            <option value="concept">概念</option>
+            <option value="general">普通</option>
+          </select>
+          <button class="btn primary" id="btnAddNote">＋ 新建笔记</button>
+          <span class="spacer"></span>
+          <button class="btn" id="btnExport">导出 JSON</button>
+          <button class="btn" id="btnImport">导入 JSON</button>
+        </div>
+        <div class="card-list" id="noteList"></div>
+        <div class="empty" id="noteEmpty">还没有笔记，去「上传识别」或手动新建吧。</div>
+      </div>
+    </section>
+
+    <!-- ============ 自我考核 ============ -->
+    <section class="view" id="view-quiz">
+      <div class="panel" id="quizSetup">
+        <h2>开始考核</h2>
+        <div class="quiz-setup-grid">
+          <div class="field">
+            <label>考核范围</label>
+            <select id="quizScope">
+              <option value="all">全部笔记</option>
+              <option value="word">仅单词</option>
+              <option value="qa">仅问答</option>
+              <option value="concept">仅概念</option>
+              <option value="wrong">错题重考</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>考核方式</label>
+            <select id="quizMode">
+              <option value="choice">选择题（四选一）</option>
+              <option value="dictation">默写填空（看释义写答案）</option>
+              <option value="flash">闪卡自测</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>题目数量</label>
+            <select id="quizCount">
+              <option value="10">10 题</option>
+              <option value="20" selected>20 题</option>
+              <option value="50">50 题</option>
+              <option value="all">全部</option>
+            </select>
+          </div>
+        </div>
+        <p class="hint" id="quizReadyHint">当前共 0 条可用笔记。</p>
+        <button class="btn primary big" id="btnStartQuiz">开始考核</button>
+      </div>
+
+      <div class="panel" id="quizPanel" hidden>
+        <div class="quiz-progress">
+          <span id="quizIndex">1 / 10</span>
+          <div class="quiz-progress-bar"><span id="quizFill"></span></div>
+          <span id="quizScore">得分 0</span>
+        </div>
+        <div class="quiz-card" id="quizCard">
+          <div class="quiz-tag" id="quizTag"></div>
+          <div class="quiz-question" id="quizQuestion"></div>
+          <div class="quiz-options" id="quizOptions"></div>
+          <div class="quiz-input-row" id="quizInputRow" hidden>
+            <input type="text" id="quizInput" placeholder="输入你的答案…" />
+            <button class="btn primary" id="btnSubmitAnswer">提交</button>
+          </div>
+          <div class="quiz-feedback" id="quizFeedback"></div>
+          <div class="quiz-nav">
+            <button class="btn" id="btnNext" hidden>下一题 →</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="quizReport" hidden>
+        <h2>考核报告</h2>
+        <div class="report-stats">
+          <div class="stat"><b id="rTotal">0</b><span>总题数</span></div>
+          <div class="stat"><b id="rCorrect">0</b><span>答对</span></div>
+          <div class="stat"><b id="rWrong">0</b><span>答错</span></div>
+          <div class="stat"><b id="rRate">0%</b><span>正确率</span></div>
+        </div>
+        <h3>错题回顾</h3>
+        <div class="card-list" id="wrongList"></div>
+        <div class="controls-row">
+          <button class="btn primary" id="btnRetryWrong">重考错题</button>
+          <button class="btn" id="btnBackSetup">返回设置</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 设置 ============ -->
+    <section class="view" id="view-settings">
+      <div class="panel">
+        <h2>AI 智能整理（可选）</h2>
+        <p class="hint">配置一个兼容 OpenAI 接口的服务，即可用大模型把原文整理成结构化笔记。不配置也能用本地「自动整理」。</p>
+        <div class="field-grid">
+          <div class="field">
+            <label>接口地址（Base URL）</label>
+            <input type="text" id="aiBaseUrl" placeholder="https://api.deepseek.com/v1" />
+          </div>
+          <div class="field">
+            <label>模型名称</label>
+            <input type="text" id="aiModel" placeholder="deepseek-chat" />
+          </div>
+          <div class="field">
+            <label>API Key</label>
+            <input type="password" id="aiKey" placeholder="sk-…" />
+          </div>
+        </div>
+        <button class="btn" id="btnSaveSettings">保存设置</button>
+      </div>
+
+      <div class="panel">
+        <h2>数据管理</h2>
+        <p class="hint">笔记保存在浏览器本地（localStorage）。建议定期导出备份。清除数据不可恢复。</p>
+        <div class="controls-row">
+          <button class="btn" id="btnExportAll">导出全部数据</button>
+          <button class="btn" id="btnImportAll">导入数据</button>
+          <button class="btn danger" id="btnClearAll">清空所有数据</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>使用说明</h2>
+        <ol class="help-list">
+          <li>「上传识别」：选图片 → 识别 → 得到原文。</li>
+          <li>点「自动整理」把原文拆成单条笔记；或「AI 智能整理」交给大模型。</li>
+          <li>「我的笔记」可增删改、搜索、导入导出。</li>
+          <li>「自我考核」按笔记自动出题：选择题 / 默写 / 闪卡，自动计分并收集错题。</li>
+          <li>笔记数据仅存在你的浏览器里，不会上传到任何服务器（AI 整理除外）。</li>
+        </ol>
+      </div>
+    </section>
+
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- 笔记编辑弹窗 -->
+  <div class="modal-mask" id="noteModal" hidden>
+    <div class="modal">
+      <h3 id="noteModalTitle">新建笔记</h3>
+      <div class="field">
+        <label>类型</label>
+        <select id="noteType">
+          <option value="word">单词（正面=单词，背面=释义）</option>
+          <option value="qa">问答（正面=问题，背面=答案）</option>
+          <option value="concept">概念（正面=概念，背面=说明）</option>
+          <option value="general">普通（正面=标题，背面=内容）</option>
+        </select>
+      </div>
+      <div class="field">
+        <label id="frontLabel">正面 / 单词</label>
+        <input type="text" id="noteFront" placeholder="例如：apple" />
+      </div>
+      <div class="field">
+        <label id="backLabel">背面 / 释义</label>
+        <textarea id="noteBack" rows="3" placeholder="例如：n. 苹果"></textarea>
+      </div>
+      <div class="field">
+        <label>标签（用逗号分隔）</label>
+        <input type="text" id="noteTags" placeholder="例如：英语, 生物" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn ghost" id="btnNoteCancel">取消</button>
+        <button class="btn primary" id="btnNoteSave">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="importFile" accept="application/json" hidden />
+
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
